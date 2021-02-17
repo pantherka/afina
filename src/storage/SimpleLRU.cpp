@@ -5,13 +5,72 @@ namespace Backend {
 
 // See MapBasedGlobalLockImpl.h
 bool SimpleLRU::Put(const std::string &key, const std::string &value) {
-    if (_lru_index.find(std::reference_wrapper<const std::string>(key)) != _lru_index.end()) {
-        SimpleLRU::Delete(key);
+    std::size_t curr_size = key.size() + value.size();
+    if (curr_size > _max_size) {
+        return false;
     }
-    return SimpleLRU::PutAbsent(key, value);
+    auto found = _lru_index.find(std::reference_wrapper<const std::string>(key));
+    if (found != _lru_index.end()) {
+        MoveToHead(found->second);
+        return SimpleLRU::UpdateNode(found->second, value);
+    }
+    return SimpleLRU::InsertNode(key, value);
 }
 
-bool SimpleLRU::PutAbsent(const std::string &key, const std::string &value) {
+// See MapBasedGlobalLockImpl.h
+bool SimpleLRU::PutIfAbsent(const std::string &key, const std::string &value) {
+    std::size_t curr_size = key.size() + value.size();
+    if (curr_size > _max_size) {
+        return false;
+    }
+    if (_lru_index.find(key) != _lru_index.end()) {
+        return false;
+    }
+    return SimpleLRU::InsertNode(key, value);
+}
+
+// See MapBasedGlobalLockImpl.h
+bool SimpleLRU::Set(const std::string &key, const std::string &value) {
+    std::size_t curr_size = key.size() + value.size();
+    if (curr_size > _max_size) {
+        return false;
+    }
+    auto found = _lru_index.find(key);
+    if (found == _lru_index.end()) {
+        return false;
+    }
+    return SimpleLRU::UpdateNode(found->second, value);
+}
+
+// See MapBasedGlobalLockImpl.h
+bool SimpleLRU::Delete(const std::string &key) {
+    if (_lru_head == nullptr) {
+        return false;
+    }
+    auto found = _lru_index.find(key);
+    if (found == _lru_index.end()) {
+        return false;
+    }
+    auto curr_node_ref = found->second;
+    std::size_t curr_size = curr_node_ref.get().key.size() + curr_node_ref.get().value.size();
+    _lru_index.erase(found);
+    _filled_size -= curr_size;
+    return SimpleLRU::DeleteFromList(curr_node_ref);
+}
+
+// See MapBasedGlobalLockImpl.h
+bool SimpleLRU::Get(const std::string &key, std::string &value) { 
+    auto found = _lru_index.find(key);
+    if (found == _lru_index.end()) {
+        return false;
+    }
+
+    SimpleLRU::MoveToHead(found->second);
+    value = found->second.get().value;
+    return true; 
+}
+
+bool SimpleLRU::InsertNode(const std::string &key, const std::string &value) {
     std::size_t curr_size = key.size() + value.size();
     if (curr_size > _max_size) {
         return false;
@@ -19,9 +78,7 @@ bool SimpleLRU::PutAbsent(const std::string &key, const std::string &value) {
     while (curr_size + _filled_size > _max_size) {
         SimpleLRU::Delete(_lru_tail->key);
     }
-    lru_node *curr_node = new lru_node(key);
-    curr_node->value = value;
-    curr_node->prev = nullptr;
+    lru_node *curr_node = new lru_node{key, value, nullptr, nullptr};
     if (_lru_tail == nullptr) {
         _lru_tail = curr_node;
     }
@@ -35,64 +92,55 @@ bool SimpleLRU::PutAbsent(const std::string &key, const std::string &value) {
     return true; 
 }
 
-// See MapBasedGlobalLockImpl.h
-bool SimpleLRU::PutIfAbsent(const std::string &key, const std::string &value) {
-    if (_lru_index.find(std::reference_wrapper<const std::string>(key)) != _lru_index.end()) {
+bool SimpleLRU::UpdateNode(lru_node &node_ref, const std::string &value) {
+    std::size_t new_size = node_ref.key.size() + value.size();
+    if (new_size > _max_size) {
         return false;
     }
-    return SimpleLRU::PutAbsent(key, value);
-}
-
-// See MapBasedGlobalLockImpl.h
-bool SimpleLRU::Set(const std::string &key, const std::string &value) {
-    if (_lru_index.find(std::reference_wrapper<const std::string>(key)) == _lru_index.end()) {
-        return false;
+    std::size_t diff = value.size() - node_ref.value.size();
+    while (_filled_size + diff > _max_size) {
+        SimpleLRU::Delete(_lru_tail->key);
     }
-    std::size_t curr_size = key.size() + value.size();
-    if (curr_size > _max_size) {
-        return false;
-    }
-    SimpleLRU::Delete(key);
-    return SimpleLRU::PutAbsent(key, value);
-}
-
-// See MapBasedGlobalLockImpl.h
-bool SimpleLRU::Delete(const std::string &key) {
-    if (_lru_head == nullptr) {
-        return false;
-    }
-    auto found = _lru_index.find(std::reference_wrapper<const std::string>(key));
-    if (found == _lru_index.end()) {
-        return false;
-    }
-    auto curr_node_ref = found->second;
-    std::size_t curr_size = curr_node_ref.get().key.size() + curr_node_ref.get().value.size();
-    _lru_index.erase(found);
-    if (curr_node_ref.get().next != nullptr) {
-        curr_node_ref.get().next->prev = curr_node_ref.get().prev;
-    }
-    else {
-        _lru_tail = curr_node_ref.get().prev;
-    }
-    if (curr_node_ref.get().prev != nullptr) {
-        curr_node_ref.get().prev->next = std::move(curr_node_ref.get().next);
-    }
-    else {
-        _lru_head = std::move(curr_node_ref.get().next);
-    }
-    _filled_size -= curr_size;
+    node_ref.value = value;
+    _filled_size += diff;   
     return true;
 }
 
-// See MapBasedGlobalLockImpl.h
-bool SimpleLRU::Get(const std::string &key, std::string &value) { 
-    auto found = _lru_index.find(std::reference_wrapper<const std::string>(key));
-    if (found == _lru_index.end()) {
-        return false;
+bool SimpleLRU::DeleteFromList(lru_node &node_ref) {
+    if (node_ref.next != nullptr) {
+        node_ref.next->prev = node_ref.prev;
     }
-    auto curr_node_ref = found->second;
-    value = curr_node_ref.get().value;
-    return true; 
+    else {
+        _lru_tail = node_ref.prev;
+    }
+    if (node_ref.prev != nullptr) {
+        node_ref.prev->next = std::move(node_ref.next);
+    }
+    else {
+        _lru_head = std::move(node_ref.next);
+    }
+    return true;
+}
+
+void SimpleLRU::MoveToHead(lru_node &node_ref) {
+    if (&node_ref == _lru_head.get()) {
+        return;
+    }
+
+    auto curr_node_ptr = std::move(node_ref.prev->next);
+    if (curr_node_ptr->next != nullptr) {
+        curr_node_ptr->next->prev = curr_node_ptr->prev;
+    }
+    else { // it was tail
+        _lru_tail = curr_node_ptr->prev;
+    }
+    // it is not head
+    curr_node_ptr->prev->next = std::move(curr_node_ptr->next);
+
+    curr_node_ptr->next = std::move(_lru_head);
+    curr_node_ptr->next->prev = curr_node_ptr.get();
+    curr_node_ptr->prev = nullptr;
+    _lru_head = std::move(curr_node_ptr);
 }
 
 } // namespace Backend

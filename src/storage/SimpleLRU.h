@@ -42,8 +42,6 @@ public:
     // Implements Afina::Storage interface
     bool Get(const std::string &key, std::string &value) override;
 
-    bool PutAbsent(const std::string &key, const std::string &value);
-
 private:
     // LRU cache node
     using lru_node = struct lru_node {
@@ -52,9 +50,22 @@ private:
         lru_node *prev;
         std::unique_ptr<lru_node> next;
         
-        lru_node(const std::string &key_new) : key(key_new) {};
     };
 
+    // adds a node to head
+    // adds a key-value pair
+    bool InsertNode(const std::string &key, const std::string &value);
+
+    // changes value in a map
+    bool UpdateNode(lru_node &node_ref, const std::string &value);
+
+    // deletes node from the list
+    bool DeleteFromList(lru_node &node_ref);
+
+    // moves node in the list to its head
+    void MoveToHead(lru_node &node_ref);
+
+private:
     // Maximum number of bytes could be stored in this cache.
     // i.e all (keys+values) must be less the _max_size
     const std::size_t _max_size;
