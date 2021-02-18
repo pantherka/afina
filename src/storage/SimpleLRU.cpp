@@ -12,9 +12,9 @@ bool SimpleLRU::Put(const std::string &key, const std::string &value) {
     auto found = _lru_index.find(std::reference_wrapper<const std::string>(key));
     if (found != _lru_index.end()) {
         MoveToHead(found->second);
-        return SimpleLRU::UpdateNode(found->second, value);
+        return UpdateNode(found->second, value);
     }
-    return SimpleLRU::InsertNode(key, value);
+    return InsertNode(key, value);
 }
 
 // See MapBasedGlobalLockImpl.h
@@ -26,7 +26,7 @@ bool SimpleLRU::PutIfAbsent(const std::string &key, const std::string &value) {
     if (_lru_index.find(key) != _lru_index.end()) {
         return false;
     }
-    return SimpleLRU::InsertNode(key, value);
+    return InsertNode(key, value);
 }
 
 // See MapBasedGlobalLockImpl.h
@@ -39,7 +39,7 @@ bool SimpleLRU::Set(const std::string &key, const std::string &value) {
     if (found == _lru_index.end()) {
         return false;
     }
-    return SimpleLRU::UpdateNode(found->second, value);
+    return UpdateNode(found->second, value);
 }
 
 // See MapBasedGlobalLockImpl.h
@@ -55,7 +55,7 @@ bool SimpleLRU::Delete(const std::string &key) {
     std::size_t curr_size = curr_node_ref.get().key.size() + curr_node_ref.get().value.size();
     _lru_index.erase(found);
     _filled_size -= curr_size;
-    return SimpleLRU::DeleteFromList(curr_node_ref);
+    return DeleteFromList(curr_node_ref);
 }
 
 // See MapBasedGlobalLockImpl.h
@@ -65,18 +65,15 @@ bool SimpleLRU::Get(const std::string &key, std::string &value) {
         return false;
     }
 
-    SimpleLRU::MoveToHead(found->second);
+    MoveToHead(found->second);
     value = found->second.get().value;
     return true; 
 }
 
 bool SimpleLRU::InsertNode(const std::string &key, const std::string &value) {
     std::size_t curr_size = key.size() + value.size();
-    if (curr_size > _max_size) {
-        return false;
-    }
     while (curr_size + _filled_size > _max_size) {
-        SimpleLRU::Delete(_lru_tail->key);
+        Delete(_lru_tail->key);
     }
     lru_node *curr_node = new lru_node{key, value, nullptr, nullptr};
     if (_lru_tail == nullptr) {
@@ -93,13 +90,9 @@ bool SimpleLRU::InsertNode(const std::string &key, const std::string &value) {
 }
 
 bool SimpleLRU::UpdateNode(lru_node &node_ref, const std::string &value) {
-    std::size_t new_size = node_ref.key.size() + value.size();
-    if (new_size > _max_size) {
-        return false;
-    }
     std::size_t diff = value.size() - node_ref.value.size();
     while (_filled_size + diff > _max_size) {
-        SimpleLRU::Delete(_lru_tail->key);
+        Delete(_lru_tail->key);
     }
     node_ref.value = value;
     _filled_size += diff;   
