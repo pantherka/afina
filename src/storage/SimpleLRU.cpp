@@ -16,7 +16,7 @@ bool SimpleLRU::Put(const std::string &key, const std::string &value) {
     }
     return InsertNode(key, value);
 }
-
+    
 // See MapBasedGlobalLockImpl.h
 bool SimpleLRU::PutIfAbsent(const std::string &key, const std::string &value) {
     std::size_t curr_size = key.size() + value.size();
@@ -39,6 +39,7 @@ bool SimpleLRU::Set(const std::string &key, const std::string &value) {
     if (found == _lru_index.end()) {
         return false;
     }
+    MoveToHead(found->second);
     return UpdateNode(found->second, value);
 }
 
@@ -72,9 +73,7 @@ bool SimpleLRU::Get(const std::string &key, std::string &value) {
 
 bool SimpleLRU::InsertNode(const std::string &key, const std::string &value) {
     std::size_t curr_size = key.size() + value.size();
-    while (curr_size + _filled_size > _max_size) {
-        Delete(_lru_tail->key);
-    }
+    FreeSpace(curr_size);
     lru_node *curr_node = new lru_node{key, value, nullptr, nullptr};
     if (_lru_tail == nullptr) {
         _lru_tail = curr_node;
@@ -91,9 +90,7 @@ bool SimpleLRU::InsertNode(const std::string &key, const std::string &value) {
 
 bool SimpleLRU::UpdateNode(lru_node &node_ref, const std::string &value) {
     std::size_t diff = value.size() - node_ref.value.size();
-    while (_filled_size + diff > _max_size) {
-        Delete(_lru_tail->key);
-    }
+    FreeSpace(diff);
     node_ref.value = value;
     _filled_size += diff;   
     return true;
@@ -134,6 +131,12 @@ void SimpleLRU::MoveToHead(lru_node &node_ref) {
     curr_node_ptr->next->prev = curr_node_ptr.get();
     curr_node_ptr->prev = nullptr;
     _lru_head = std::move(curr_node_ptr);
+}
+
+void SimpleLRU::FreeSpace(int diff) {
+    while (_filled_size + diff > _max_size) {
+        Delete(_lru_tail->key);
+    }
 }
 
 } // namespace Backend

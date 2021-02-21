@@ -65,6 +65,9 @@ private:
     // moves node in the list to its head
     void MoveToHead(lru_node &node_ref);
 
+    // deletes from tail
+    void FreeSpace(int diff);
+
 private:
     // Maximum number of bytes could be stored in this cache.
     // i.e all (keys+values) must be less the _max_size
