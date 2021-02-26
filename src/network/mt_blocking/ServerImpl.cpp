@@ -99,7 +99,6 @@ void ServerImpl::Join() {
         }
         _cond_var.wait(_lock);
     }
-    close(_server_socket);
 }
 
 // See Server.h
@@ -152,6 +151,7 @@ void ServerImpl::OnRun() {
 
     // Cleanup on exit...
     _logger->warn("Network stopped");
+    close(_server_socket);
 }
 
 void ServerImpl::IsWorking(int client_socket) {
@@ -249,7 +249,9 @@ void ServerImpl::IsWorking(int client_socket) {
         close(client_socket);
         _client_sockets.erase(client_socket);
 
-        _cond_var.notify_all();
+        if (!running) {
+            _cond_var.notify_all();
+        }
     }
 
 }
