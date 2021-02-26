@@ -2,6 +2,9 @@
 #define AFINA_NETWORK_MT_BLOCKING_SERVER_H
 
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <set>
 #include <thread>
 
 #include <afina/network/Server.h>
@@ -38,6 +41,9 @@ protected:
      */
     void OnRun();
 
+    // live cycle of a thread
+    void IsWorking(int client_socket);
+
 private:
     // Logger instance
     std::shared_ptr<spdlog::logger> _logger;
@@ -49,6 +55,17 @@ private:
 
     // Server socket to accept connections on
     int _server_socket;
+
+    // Opened client sockets
+    std::set<int> _client_sockets;
+
+    // Maximum amount of clients at the same time
+    std::size_t _max_workers;
+
+    // lock for opening | closing socket
+    std::mutex _server_mutex;
+
+    std::condition_variable _cond_var;
 
     // Thread to run network on
     std::thread _thread;
