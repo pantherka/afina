@@ -6,8 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "ThreadSafeSimpleLRU.h"
-// #include "SimpleLRU.h"
+#include "SimpleLRU.h"
 
 namespace Afina {
 namespace Backend {
@@ -19,11 +18,11 @@ namespace Backend {
  */
 class StripedLRU : public Afina::Storage {
 public:
-    static StripedLRU* BuildStripedLRU(size_t stripe_count, size_t max_size = 1024);
+    static std::unique_ptr<StripedLRU> BuildStripedLRU(size_t stripe_count, size_t max_size);
 
     StripedLRU(size_t stripe_count, size_t max_shard_size = 1024) : _shards_count(stripe_count) {
         for (size_t i = 0; i < stripe_count; ++i) {
-            _shards.emplace_back(stripe_count, max_shard_size);
+            _shards.emplace_back(max_shard_size);
         }
     }
     ~StripedLRU() {}
@@ -59,8 +58,7 @@ public:
     }
 
 private:
-    std::vector<ThreadSafeSimplLRU> _shards;
-    // std::vector<SimpleLRU> _shards;
+    std::vector<SimpleLRU> _shards;
     size_t _shards_count = 4;
 };
 

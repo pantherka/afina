@@ -57,7 +57,7 @@ public:
         } else if (storage_type == "mt_lru") {
             storage = std::make_shared<Afina::Backend::ThreadSafeSimplLRU>();
         } else if (storage_type == "mt_slru") {
-            storage = std::make_shared<Afina::Backend::StripedLRU>(Afina::Backend::StripedLRU::BuildStripedLRU(4, 16 * 1024 * 1024));
+            storage = std::shared_ptr<Afina::Backend::StripedLRU>(Afina::Backend::StripedLRU::BuildStripedLRU(4, 32 * 1024 * 1024UL));
         } else {
             throw std::runtime_error("Unknown storage type");
         }

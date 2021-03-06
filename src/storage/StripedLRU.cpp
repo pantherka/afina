@@ -3,12 +3,12 @@
 
 namespace Afina {
 namespace Backend {
-    static StripedLRU* BuildStripedLRU(size_t stripe_count, size_t max_size = 1024) {
+    std::unique_ptr<StripedLRU> StripedLRU::BuildStripedLRU(size_t stripe_count, size_t max_size) {
         size_t max_shard_size = max_size / stripe_count;
-        if (max_shard_size < 16 * 1024 * 1024) {
+        if (max_shard_size < 1024 * 1024UL) {
             throw std::runtime_error("Too many stripes");
         }
-        StripedLRU* cache = new StripedLRU(stripe_count, max_shard_size);
+        auto cache = std::unique_ptr<StripedLRU>(new StripedLRU(stripe_count, max_shard_size));
         return std::move(cache);
     }
 
