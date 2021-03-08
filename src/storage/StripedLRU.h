@@ -17,14 +17,15 @@ namespace Backend {
  *
  */
 class StripedLRU : public Afina::Storage {
-public:
-    static std::unique_ptr<StripedLRU> BuildStripedLRU(size_t stripe_count, size_t max_size);
-
+private:
     StripedLRU(size_t stripe_count, size_t max_shard_size = 1024) : _shards_count(stripe_count) {
         for (size_t i = 0; i < stripe_count; ++i) {
             _shards.emplace_back(max_shard_size);
         }
     }
+public:
+    static std::unique_ptr<StripedLRU> BuildStripedLRU(size_t stripe_count, size_t max_size);
+
     ~StripedLRU() {}
 
     // see ThreadSafeSimpleLRU.h
