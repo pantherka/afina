@@ -249,7 +249,7 @@ void ServerImpl::IsWorking(int client_socket) {
         close(client_socket);
         _client_sockets.erase(client_socket);
 
-        if (!running) {
+        if (!running && _client_sockets.empty()) {
             _cond_var.notify_all();
         }
     }
