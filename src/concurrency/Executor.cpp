@@ -1,19 +1,20 @@
 #include <afina/concurrency/Executor.h>
+#include <iostream>
 
 namespace Afina {
 namespace Concurrency {
 
 void perform(Executor *executor) {
+    std::unique_lock<std::mutex> lock(executor->mutex);
+    executor->_thread_count++;
     while (executor->state != Executor::State::kStopped) {
-        std::unique_lock<std::mutex> lock(executor->mutex);
         if (executor->tasks.empty()) {
+            if (executor->state == Executor::State::kStopping) {
+                executor->state = Executor::State::kStopped;
+            }
             auto responce = executor->empty_condition.wait_for(lock, std::chrono::milliseconds(executor->_idle_time));
             if (responce == std::cv_status::timeout) {
                 if (executor->tasks.size() > executor->_low_watermark) {
-                    executor->_thread_count--;
-                    if (executor->_thread_count == 0) {
-                        executor->last_thread.notify_all();
-                    }
                     break;
                 }
                 else {
@@ -30,18 +31,22 @@ void perform(Executor *executor) {
         lock.unlock();
         task();
     }
+    executor->_thread_count--;
+    if (executor->_thread_count == 0) {
+        executor->last_thread.notify_all();
+    }
 }
 
-Executor::Executor(std::string name, size_t low_watermark, size_t high_watermark, size_t max_queue_size, size_t idle_time) :
+Executor::Executor(size_t low_watermark, size_t high_watermark, size_t max_queue_size, size_t idle_time) :
                     _low_watermark(low_watermark), _high_watermark(high_watermark), _max_queue_size(max_queue_size), _idle_time(idle_time) {
     
-    _thread_count = _low_watermark;
     for (size_t i = 0; i < _low_watermark; ++i) {
         std::thread(&perform, this).detach();
     }
 }
 
 void Executor::Stop(bool await) {
+    std::unique_lock<std::mutex> lock(mutex);
     if (!await) {
         state = State::kStopped;
         return;
@@ -49,7 +54,7 @@ void Executor::Stop(bool await) {
     else {
         state = State::kStopping;
     }
-    std::unique_lock<std::mutex> lock(mutex);
+    empty_condition.notify_all();
     while(_thread_count > 0) {
         last_thread.wait(lock);
     }

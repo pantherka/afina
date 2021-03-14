@@ -20,6 +20,8 @@
 #include <afina/Storage.h>
 #include <afina/execute/Command.h>
 #include <afina/logging/Service.h>
+#include <afina/concurrency/Executor.h>
+
 
 #include "protocol/Parser.h"
 
@@ -28,7 +30,8 @@ namespace Network {
 namespace MTblocking {
 
 // See Server.h
-ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Logging::Service> pl) : Server(ps, pl) {}
+ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Logging::Service> pl) : Server(ps, pl), _executor(2, 8, 64, 1000) {}
+
 
 // See Server.h
 ServerImpl::~ServerImpl() {}

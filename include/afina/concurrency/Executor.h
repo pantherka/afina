@@ -20,11 +20,13 @@ void perform(Executor *executor);
  * # Thread pool
  */
 class Executor {
+
+public:
     enum class State {
         // Threadpool is fully operational, tasks could be added and get executed
         kRun,
 
-        // Threadpool is on the way to be shutdown, no ned task could be added, but existing will be
+        // Threadpool is on the way to be shutdown, no new task could be added, but existing will be
         // completed as requested
         kStopping,
 
@@ -32,7 +34,8 @@ class Executor {
         kStopped
     };
 
-    Executor(std::string name, size_t low_watermark, size_t high_watermark, size_t max_queue_size = 100, size_t idle_time = 1000);
+public:
+    Executor(size_t low_watermark=2, size_t high_watermark=8, size_t max_queue_size=64, size_t idle_time=1000);
     ~Executor();
 
     /**

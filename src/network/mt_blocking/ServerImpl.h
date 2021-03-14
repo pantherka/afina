@@ -8,6 +8,8 @@
 #include <thread>
 
 #include <afina/network/Server.h>
+#include <afina/concurrency/Executor.h>
+
 
 namespace spdlog {
 class logger;
@@ -58,6 +60,9 @@ private:
 
     // Opened client sockets
     std::set<int> _client_sockets;
+
+    // ThreadPool
+    Concurrency::Executor _executor;
 
     // Maximum amount of clients at the same time
     std::size_t _max_workers;
