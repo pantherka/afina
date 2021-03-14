@@ -12,6 +12,10 @@
 namespace Afina {
 namespace Concurrency {
 
+class Executor;
+
+void perform(Executor *executor);
+
 /**
  * # Thread pool
  */
@@ -28,7 +32,7 @@ class Executor {
         kStopped
     };
 
-    Executor(std::string name, int size);
+    Executor(std::string name, size_t low_watermark, size_t high_watermark, size_t max_queue_size = 100, size_t idle_time = 1000);
     ~Executor();
 
     /**
@@ -55,6 +59,12 @@ class Executor {
             return false;
         }
 
+        if (tasks.size() == _max_queue_size) {
+            return false;
+        }
+        if (!tasks.empty() && _thread_count < _high_watermark) {
+            std::thread(&perform, this).detach();
+        }
         // Enqueue new task
         tasks.push_back(exec);
         empty_condition.notify_one();
@@ -84,9 +94,15 @@ private:
     std::condition_variable empty_condition;
 
     /**
+     * Conditional variable to wait for the last thread in Stop
+     */
+    std::condition_variable last_thread;
+
+    /**
      * Vector of actual threads that perorm execution
      */
-    std::vector<std::thread> threads;
+    // std::vector<std::thread> threads;
+    size_t _thread_count = 0;
 
     /**
      * Task queue
@@ -97,6 +113,11 @@ private:
      * Flag to stop bg threads
      */
     State state;
+
+    size_t _low_watermark;
+    size_t _high_watermark;
+    size_t _max_queue_size;
+    size_t _idle_time;
 };
 
 } // namespace Concurrency
