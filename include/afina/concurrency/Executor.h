@@ -35,7 +35,7 @@ public:
     };
 
 public:
-    Executor(size_t low_watermark=2, size_t high_watermark=8, size_t max_queue_size=64, size_t idle_time=1000);
+    Executor(size_t low_watermark=4, size_t high_watermark=8, size_t max_queue_size=64, size_t idle_time=1000);
     ~Executor();
 
     /**
@@ -65,7 +65,7 @@ public:
         if (tasks.size() == _max_queue_size) {
             return false;
         }
-        if (!tasks.empty() && _thread_count < _high_watermark) {
+        if (_free_threads == 0 && _thread_count < _high_watermark) {
             std::thread(&perform, this).detach();
         }
         // Enqueue new task
@@ -106,6 +106,11 @@ private:
      */
     // std::vector<std::thread> threads;
     size_t _thread_count = 0;
+
+    /**
+     * Number of idle threads at the moment
+    */
+    size_t _free_threads = 0;
 
     /**
      * Task queue

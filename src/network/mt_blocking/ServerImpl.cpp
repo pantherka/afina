@@ -20,7 +20,6 @@
 #include <afina/Storage.h>
 #include <afina/execute/Command.h>
 #include <afina/logging/Service.h>
-#include <afina/concurrency/Executor.h>
 
 
 #include "protocol/Parser.h"
@@ -30,7 +29,7 @@ namespace Network {
 namespace MTblocking {
 
 // See Server.h
-ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Logging::Service> pl) : Server(ps, pl), _executor(2, 8, 64, 1000) {}
+ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Logging::Service> pl) : Server(ps, pl), _executor() {}
 
 
 // See Server.h
@@ -88,6 +87,7 @@ void ServerImpl::Stop() {
         shutdown(client_socket, SHUT_RD);
     }
     shutdown(_server_socket, SHUT_RDWR);
+    _executor.Stop(false);
 }
 
 // See Server.h
@@ -102,6 +102,7 @@ void ServerImpl::Join() {
         }
         _cond_var.wait(_lock);
     }
+    _executor.Stop(true);
 }
 
 // See Server.h
@@ -142,9 +143,12 @@ void ServerImpl::OnRun() {
             std::lock_guard<std::mutex> _lock(_server_mutex);
             if (_client_sockets.size() < _max_workers && running){
                 _client_sockets.insert(client_socket);
-                // vector <thread>
-                _logger->debug("Thread starting {}", client_socket);
-                std::thread(&ServerImpl::IsWorking, this, client_socket).detach();
+                bool success = _executor.Execute(&ServerImpl::IsWorking, this, client_socket);
+                if (!success) {
+                    close(client_socket);
+                }
+                _logger->debug("Task starting on {}", client_socket);
+                // std::thread(&ServerImpl::IsWorking, this, client_socket).detach();
             }
             else {
                 close(client_socket);
